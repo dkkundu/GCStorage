@@ -22,7 +22,7 @@ class GCStorageApiVew(Resource):
             file.download_to_filename(blob_name)
             return send_file(blob_name, as_attachment=True)
         else:
-            return {"message": "file not found"}, 400
+            return {"message": "file not found"}, 404
 
     def post(self):
         # GivenSample Data

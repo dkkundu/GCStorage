@@ -1,7 +1,7 @@
 {
-   "firstName":"Dipto",
-   "secondName":"Kundu",
-   "ageInYears":27,
+   "Name":"Dipto",
+   "SDName":"Kundu",
+   "ageYears":27,
    "address":"Mirpur Dhaka",
    "creditScore":90.5
 }
