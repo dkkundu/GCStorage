@@ -1,41 +1,61 @@
 # system import
-import pathlib
-from flask import Flask
+import json
+import jsonschema
+from flask import Flask, send_file
 from flask_restful import Resource, Api, reqparse
 from werkzeug.datastructures import FileStorage
-from read_json_file import validate_file
-
+from werkzeug.utils import secure_filename
+from GCSBucket import storage_client, BUCKET_NAME
 
 # Google Cloud storage App
 app = Flask("GCStorage")
 api = Api(app)
 
-# making fonder for file
-working_dir = pathlib.Path.cwd()
-files_folder = working_dir.joinpath('my_files')
-downloads_folder = working_dir.joinpath('downloaded')
-
 
 class GCStorageApiVew(Resource):
-
     # get method
     def get(self):
-        return "hello world"
+        blob_name = 'configuration-file.json'
+        bucket_in_gcp = storage_client.bucket(BUCKET_NAME)
+        file = bucket_in_gcp.blob(blob_name)
+        if file.exists():
+            file.download_to_filename(blob_name)
+            return send_file(blob_name, as_attachment=True)
+        else:
+            return {"message": "file not found"}, 400
 
     def post(self):
-        # read file from the request
+        # GivenSample Data
+        provided_schema = {
+            "firstName": str,
+            "secondName": str,
+            "ageInYears": int,
+            "address": str,
+            "creditScore": float
+        }
+        # Taking file from the API
         parser = reqparse.RequestParser()
         parser.add_argument('file', type=FileStorage, location='files')
         args = parser.parse_args()
         file = args['file']
-        # get file name
-        filename = file.filename
-        if filename == "configuration-file.json":
-            # check provided_schema valid or not
-            status, messages = validate_file(file)
-            if not status:
-                return {"message": messages}, 400
-            return {"message": "Successfully Saved"}, 200
+
+        filename_check = file.filename
+        if filename_check == "configuration-file.json":
+            file_contents = file.read()
+            file.seek(0)
+            data = json.loads(file_contents)
+            try:
+                # verified to ensure the file match[JSON schema]
+                jsonschema.validate(data, provided_schema)
+                # Get the filename and extension for upload
+                filename = secure_filename(file.filename)
+                bucket = storage_client.get_bucket(BUCKET_NAME)
+                blob = bucket.blob(filename)
+                blob.upload_from_file(file.stream)
+                return {"message": "File uploaded successfully"}, 200
+
+            except jsonschema.exceptions.ValidationError as e:
+                return {"message": e.message}, 400
         else:
             return {
                 "message": "the file format is invalid. It should be 'configuration-file.json'" # noqa
